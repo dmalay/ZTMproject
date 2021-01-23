@@ -22,8 +22,25 @@ class App extends Component {
       imageUrl: '',
       box: {},
       route: 'signin',
-      isSignedIn: false
+      isSignedIn: false,
+      user: {
+        id: '',
+        name: '',
+        email: '',
+        entries: 0,
+        joined: ''
+      }
     }
+  }
+
+  loadUser = (data) => {
+    this.setState({user: {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      entries: data.entries,
+      joined: data.joined
+    }})
   }
 
   calculateFaceLocation = (data) => {
@@ -60,15 +77,7 @@ class App extends Component {
     this.setState({ imageUrl: this.state.input })
     app.models
       .predict(
-        // HEADS UP! Sometimes the Clarifai Models can be down or not working as they are constantly getting updated.
-        // A good way to check if the model you are using is up, is to check them on the clarifai website. For example,
-        // for the Face Detect Mode: https://www.clarifai.com/models/face-detection
-        // If that isn't working, then that means you will have to wait until their servers are back up. Another solution
-        // is to use a different version of their model that works like: `c0c0ac362b03416da06ab3fa36fb58e3`
-        // so you would change from:
-        // .predict(Clarifai.FACE_DETECT_MODEL, this.state.input)
-        // to:
-        // .predict('c0c0ac362b03416da06ab3fa36fb58e3', this.state.input)
+        // ('c0c0ac362b03416da06ab3fa36fb58e3', this.state.input)
         Clarifai.FACE_DETECT_MODEL,
         // 'http://ufatime.ru/media/ft/e7/28/e7283799-65c1-422e-a145-488696dcb891/face-250719.jpg__430x322_q85_crop_subsampling-2_upscale.jpg'
         this.state.input
@@ -76,6 +85,20 @@ class App extends Component {
       .then(response => {
         this.calculateFaceLocation(response)
         console.log('hi', response.outputs[0].data.regions[0].region_info.bounding_box)
+        if (response) {
+          fetch('http://localhost:3001/image', {
+            method: 'put',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              id: this.state.user.id
+            })
+          })
+            .then(response => response.json())
+            .then(count => {
+              this.setState(Object.assign(this.state.user, { entries: count}))
+            })
+
+        }
         this.displayFaceBox(this.calculateFaceLocation(response))
       })
       .catch(err => console.log(err))
@@ -90,14 +113,17 @@ class App extends Component {
           ?
           <div>
             <Logo />
-            <Rank />
+            <Rank
+            name={this.state.user.name}
+            entries={this.state.user.entries}
+            />
             <ImageLinkForm onInputChange={this.onInputChange} onButtonClick={this.onButtonClick} />
             <FaceRecognition box={box} imageUrl={imageUrl} />
           </div>
           : (
             route === 'signin'
-              ? <SignIn onRouteChange={this.onRouteChange} />
-              : <Register onRouteChange={this.onRouteChange} />
+              ? <SignIn onRouteChange={this.onRouteChange} loadUser={this.loadUser} />
+              : <Register onRouteChange={this.onRouteChange} loadUser={this.loadUser}/>
           )
         }
       </div>
